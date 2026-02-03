@@ -10,6 +10,7 @@ const cloudinary = require("cloudinary").v2;
 const axios = require("axios");
 const nodemailer = require("nodemailer");
 const otpStore = {};
+import axios from "axios";
 
 
 cloudinary.config({
@@ -44,53 +45,40 @@ db.connect(err => {
 
 
 async function sendOtpMail(email, otp) {
-  const transporter = nodemailer.createTransport({
-   host: "smtp-relay.brevo.com",
-      port: 587,
-     secure: false,
-    auth: {
-      user: "apikey",      // Gmail ผู้ส่ง
-      pass: process.env.BREVO_SMTP_KEY,     // App Password
+  await axios.post(
+    "https://api.brevo.com/v3/smtp/email",
+    {
+      sender: {
+        name: "My App",
+        email: "kasiditkosit@gmail.com",
+      },
+      to: [
+        {
+          email: email,
+        },
+      ],
+      subject: "OTP Verification Code",
+      htmlContent: `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+          <h2>OTP Verification</h2>
+          <p>เรียน ผู้ใช้งาน</p>
+          <p>
+            กรุณาใช้รหัส OTP ด้านล่างเพื่อยืนยันตัวตน
+          </p>
+          <h1 style="letter-spacing: 6px;">${otp}</h1>
+          <p>รหัสมีอายุ 5 นาที</p>
+          <p>My App Team</p>
+        </div>
+      `,
     },
-  });
-
-await transporter.sendMail({
-  from: `"My App" <kasiditkosit@gmail.com>`,
-  to: email,
-  subject: "OTP Verification Code",
-  html: `
-    <div style="font-family: Arial, sans-serif; color: #333;">
-      <h2>OTP Verification</h2>
-
-      <p>เรียน ผู้ใช้งาน</p>
-
-      <p>
-        ตามที่ท่านได้ร้องขอการยืนยันตัวตน กรุณาใช้รหัสยืนยันแบบใช้ครั้งเดียว
-        (One-Time Password: OTP) ด้านล่างนี้เพื่อดำเนินการต่อ
-      </p>
-
-      <h1 style="letter-spacing: 6px; color: #000;">
-        ${otp}
-      </h1>
-
-      <p>
-        รหัสนี้มีอายุการใช้งานภายใน <b>5 นาที</b>
-        กรุณาอย่าเปิดเผยรหัสนี้แก่ผู้อื่น
-      </p>
-
-      <p>
-        หากท่านไม่ได้เป็นผู้ร้องขอ กรุณาเพิกเฉยต่ออีเมลฉบับนี้
-      </p>
-
-      <br />
-      <p>ขอแสดงความนับถือ</p>
-      <p><b>My App Team</b></p>
-    </div>
-  `,
-});
-
+    {
+      headers: {
+        "api-key": process.env.BREVO_SMTP_KEY,
+        "Content-Type": "application/json",
+      },
+    }
+  );
 }
-
 
 
 
@@ -496,6 +484,7 @@ console.log(userId);
 app.listen(3001, () => {
   console.log("🚀 Server running on port 3001")
 })
+
 
 
 
