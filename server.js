@@ -50,7 +50,7 @@ async function sendOtpMail(email, otp) {
      secure: false,
     auth: {
       user: "apikey",      // Gmail ผู้ส่ง
-      pass: "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",     // App Password
+      pass: process.env.BREVO_SMTP_KEY,     // App Password
     },
   });
 
@@ -496,6 +496,7 @@ console.log(userId);
 app.listen(3001, () => {
   console.log("🚀 Server running on port 3001")
 })
+
 
 
 
