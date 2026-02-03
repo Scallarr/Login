@@ -45,7 +45,7 @@ db.connect(err => {
 
 async function sendOtpMail(email, otp) {
   const transporter = nodemailer.createTransport({
-   host: "smtpข-relay.brevo.com",
+   host: "smtp-relay.brevo.com",
       port: 587,
      secure: false,
     auth: {
@@ -496,6 +496,7 @@ console.log(userId);
 app.listen(3001, () => {
   console.log("🚀 Server running on port 3001")
 })
+
 
 
 
