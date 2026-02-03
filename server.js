@@ -47,6 +47,7 @@ async function sendOtpMail(email, otp) {
   const transporter = nodemailer.createTransport({
    host: "smtp.gmail.com",
       port: 465,
+     secure: true,
     auth: {
       user: "kasiditkosit@gmail.com",      // Gmail ผู้ส่ง
       pass: "axar klme xwmo pdpn",     // App Password
@@ -495,4 +496,5 @@ console.log(userId);
 app.listen(3001, () => {
   console.log("🚀 Server running on port 3001")
 })
+
 
