@@ -10,7 +10,7 @@ const cloudinary = require("cloudinary").v2;
 const axios = require("axios");
 const nodemailer = require("nodemailer");
 const otpStore = {};
-import axios from "axios";
+
 
 
 cloudinary.config({
@@ -43,6 +43,7 @@ db.connect(err => {
 })
 
 
+console.log("BREVO KEY exists:", !!process.env.BREVO_SMTP_KEY);
 
 async function sendOtpMail(email, otp) {
   await axios.post(
@@ -484,6 +485,7 @@ console.log(userId);
 app.listen(3001, () => {
   console.log("🚀 Server running on port 3001")
 })
+
 
 
 
