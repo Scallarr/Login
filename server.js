@@ -45,12 +45,12 @@ db.connect(err => {
 
 async function sendOtpMail(email, otp) {
   const transporter = nodemailer.createTransport({
-   host: "smtp.gmail.com",
-      port: 465,
-     secure: true,
+   host: "smtpข-relay.brevo.com",
+      port: 587,
+     secure: false,
     auth: {
-      user: "kasiditkosit@gmail.com",      // Gmail ผู้ส่ง
-      pass: "axar klme xwmo pdpn",     // App Password
+      user: "apikey",      // Gmail ผู้ส่ง
+      pass: "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",     // App Password
     },
   });
 
@@ -496,5 +496,6 @@ console.log(userId);
 app.listen(3001, () => {
   console.log("🚀 Server running on port 3001")
 })
+
 
 
