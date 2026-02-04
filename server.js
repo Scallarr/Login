@@ -161,7 +161,7 @@ app.get("/chat-history/:targetId", verifyToken, (req, res) => {
 
   db.query(
     `
-    SELECT sender_id, receiver_id, message, image, created_at
+    SELECT id, sender_id, receiver_id, message, image, created_at
     FROM messages
     WHERE
       (sender_id = ? AND receiver_id = ?)
@@ -173,6 +173,25 @@ app.get("/chat-history/:targetId", verifyToken, (req, res) => {
     (err, results) => {
       if (err) return res.status(500).json({ message: "DB error" });
       res.json(results);
+    }
+  );
+});
+
+app.delete("/delete-message/:id", verifyToken, (req, res) => {
+  const msgId = req.params.id;
+  const userId = req.user.id;
+
+  db.query(
+    "SELECT * FROM messages WHERE id = ? AND sender_id = ?",
+    [msgId, userId],
+    (err, results) => {
+      if (err) return res.status(500).json({ message: "DB error" });
+      if (results.length === 0) return res.status(403).json({ message: "Not allowed" });
+
+      db.query("DELETE FROM messages WHERE id = ?", [msgId], (err) => {
+        if (err) return res.status(500).json({ message: "Delete failed" });
+        res.json({ message: "Deleted" });
+      });
     }
   );
 });
@@ -567,6 +586,15 @@ io.on("connection", (socket) => {
     socket.join(room);
   });
 
+  socket.on("deleteMessage", ({ senderId, receiverId, messageId }) => {
+    const room =
+      senderId < receiverId
+        ? `${senderId}_${receiverId}`
+        : `${receiverId}_${senderId}`;
+
+    io.to(room).emit("messageDeleted", { messageId });
+  });
+
   socket.on("sendMessage", (data) => {
     const { senderId, receiverId, message, image } = data;
 
@@ -577,20 +605,23 @@ io.on("connection", (socket) => {
 
     db.query(
       "INSERT INTO messages (sender_id, receiver_id, message, image) VALUES (?, ?, ?, ?)",
-      [senderId, receiverId, message || null, image || null]
-    );
+      [senderId, receiverId, message || null, image || null],
+      (err, result) => {
+        if (err) return;
 
-    const payload = { senderId, receiverId, message, image, time: new Date() };
+        const payload = { id: result.insertId, senderId, receiverId, message, image, time: new Date() };
 
-    io.to(room).emit("receiveMessage", payload);
+        io.to(room).emit("receiveMessage", payload);
 
-    const receiverSocketId = userSocketMap[receiverId];
-    if (receiverSocketId) {
-      const receiverSocket = io.sockets.sockets.get(receiverSocketId);
-      if (receiverSocket && !receiverSocket.rooms.has(room)) {
-        receiverSocket.emit("receiveMessage", payload);
+        const receiverSocketId = userSocketMap[receiverId];
+        if (receiverSocketId) {
+          const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+          if (receiverSocket && !receiverSocket.rooms.has(room)) {
+            receiverSocket.emit("receiveMessage", payload);
+          }
+        }
       }
-    }
+    );
   });
 
   socket.on("disconnect", () => {
@@ -610,7 +641,6 @@ io.on("connection", (socket) => {
 server.listen(3001, () => {
   console.log("🚀 Server running on port 3001")
 })
-
 
 
 
