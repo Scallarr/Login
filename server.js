@@ -154,6 +154,51 @@ console.log("Generated OTP:", otp);
   );
 });
 
+app.get("/chat-history/:targetId", verifyToken, (req, res) => {
+  const myId = req.user.id;
+  const targetId = req.params.targetId;
+
+  db.query(
+    `
+    SELECT sender_id, receiver_id, message, image, created_at
+    FROM messages
+    WHERE
+      (sender_id = ? AND receiver_id = ?)
+      OR
+      (sender_id = ? AND receiver_id = ?)
+    ORDER BY created_at ASC
+    `,
+    [myId, targetId, targetId, myId],
+    (err, results) => {
+      if (err) return res.status(500).json({ message: "DB error" });
+      res.json(results);
+    }
+  );
+});
+
+app.post("/upload-chat-image", verifyToken, upload.single("image"), async (req, res) => {
+  if (!req.file) return res.status(400).json({ message: "No file" });
+
+  try {
+    const result = await new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_stream(
+        { folder: "chat_images", resource_type: "image" },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        }
+      ).end(req.file.buffer);
+    });
+
+    res.json({ url: result.secure_url });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Upload failed" });
+  }
+});
+
+
+
 
 
 
@@ -502,8 +547,15 @@ app.get("/all-users", (req, res) => {
 
 
 
+
+const userSocketMap = {};
+
 io.on("connection", (socket) => {
   console.log("🟢 Socket connected:", socket.id);
+
+  socket.on("joinUser", (userId) => {
+    userSocketMap[userId] = socket.id;
+  });
 
   socket.on("joinRoom", ({ userId, targetId }) => {
     const room =
@@ -512,63 +564,51 @@ io.on("connection", (socket) => {
         : `${targetId}_${userId}`;
 
     socket.join(room);
-    console.log("Joined room:", room);
   });
 
   socket.on("sendMessage", (data) => {
-    const { senderId, receiverId, message } = data;
+    const { senderId, receiverId, message, image } = data;
 
     const room =
       senderId < receiverId
         ? `${senderId}_${receiverId}`
         : `${receiverId}_${senderId}`;
 
-    // บันทึก DB
     db.query(
-      "INSERT INTO messages (sender_id, receiver_id, message) VALUES (?, ?, ?)",
-      [senderId, receiverId, message]
+      "INSERT INTO messages (sender_id, receiver_id, message, image) VALUES (?, ?, ?, ?)",
+      [senderId, receiverId, message || null, image || null]
     );
 
-    // realtime
-    io.to(room).emit("receiveMessage", {
-      senderId,
-      message,
-      time: new Date()
-    });
+    const payload = { senderId, receiverId, message, image, time: new Date() };
+
+    io.to(room).emit("receiveMessage", payload);
+
+    const receiverSocketId = userSocketMap[receiverId];
+    if (receiverSocketId) {
+      const receiverSocket = io.sockets.sockets.get(receiverSocketId);
+      if (receiverSocket && !receiverSocket.rooms.has(room)) {
+        receiverSocket.emit("receiveMessage", payload);
+      }
+    }
   });
 
   socket.on("disconnect", () => {
+    for (const [userId, sid] of Object.entries(userSocketMap)) {
+      if (sid === socket.id) {
+        delete userSocketMap[userId];
+        break;
+      }
+    }
     console.log("🔴 Socket disconnected:", socket.id);
   });
 });
 
 
-app.get("/chat-history/:targetId", verifyToken, (req, res) => {
-  const myId = req.user.id;
-  const targetId = req.params.targetId;
 
-  db.query(
-    `
-    SELECT sender_id, receiver_id, message, created_at
-    FROM messages
-    WHERE 
-      (sender_id = ? AND receiver_id = ?)
-      OR
-      (sender_id = ? AND receiver_id = ?)
-    ORDER BY created_at ASC
-    `,
-    [myId, targetId, targetId, myId],
-    (err, results) => {
-      if (err) return res.status(500).json({ message: "DB error" });
-      res.json(results);
-    }
-  );
-});
 
 server.listen(3001, () => {
   console.log("🚀 Server running on port 3001")
 })
-
 
 
 
