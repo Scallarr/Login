@@ -12,7 +12,7 @@ const nodemailer = require("nodemailer");
 const http = require("http");
 const { Server } = require("socket.io");
 const otpStore = {};
-
+const upload = multer({ storage: multer.memoryStorage() });
 
 const app = express()
 app.use(cors())
@@ -609,6 +609,7 @@ io.on("connection", (socket) => {
 server.listen(3001, () => {
   console.log("🚀 Server running on port 3001")
 })
+
 
 
 
