@@ -9,7 +9,22 @@ const bcrypt = require("bcrypt")
 const cloudinary = require("cloudinary").v2;
 const axios = require("axios");
 const nodemailer = require("nodemailer");
+const http = require("http");
+const { Server } = require("socket.io");
 const otpStore = {};
+
+
+const app = express()
+app.use(cors())
+app.use(express.json())
+const server = http.createServer(app);
+
+const io = new Server(server, {
+  cors: {
+    origin: "*"
+  }
+});
+
 
 
 
@@ -23,14 +38,11 @@ module.exports = cloudinary;
 
 
 
-const app = express()
-app.use(cors())
-app.use(express.json())
 
 const SECRET_KEY = "TestSecretKey"
 
 // 🔹 MySQL
-const db = mysql.createConnection({
+const db = mysql.createPool({
   host: "b4k7lvucka06qzmkt9oe-mysql.services.clever-cloud.com",
   user: "u8yx08gazmxrgesr",
   password: "WiyM2e4CES1FbDdsQ5Vh",
@@ -482,9 +494,84 @@ console.log(userId);
 });
 
 
-app.listen(3001, () => {
+app.get("/all-users", (req, res) => {
+  db.query(
+    "SELECT id, name FROM users",
+    (err, results) => res.json(results)
+  );
+});
+
+
+
+
+
+io.on("connection", (socket) => {
+  console.log("🟢 Socket connected:", socket.id);
+
+  socket.on("joinRoom", ({ userId, targetId }) => {
+    const room =
+      userId < targetId
+        ? `${userId}_${targetId}`
+        : `${targetId}_${userId}`;
+
+    socket.join(room);
+    console.log("Joined room:", room);
+  });
+
+  socket.on("sendMessage", (data) => {
+    const { senderId, receiverId, message } = data;
+
+    const room =
+      senderId < receiverId
+        ? `${senderId}_${receiverId}`
+        : `${receiverId}_${senderId}`;
+
+    // บันทึก DB
+    db.query(
+      "INSERT INTO messages (sender_id, receiver_id, message) VALUES (?, ?, ?)",
+      [senderId, receiverId, message]
+    );
+
+    // realtime
+    io.to(room).emit("receiveMessage", {
+      senderId,
+      message,
+      time: new Date()
+    });
+  });
+
+  socket.on("disconnect", () => {
+    console.log("🔴 Socket disconnected:", socket.id);
+  });
+});
+
+
+app.get("/chat-history/:targetId", verifyToken, (req, res) => {
+  const myId = req.user.id;
+  const targetId = req.params.targetId;
+
+  db.query(
+    `
+    SELECT sender_id, receiver_id, message, created_at
+    FROM messages
+    WHERE 
+      (sender_id = ? AND receiver_id = ?)
+      OR
+      (sender_id = ? AND receiver_id = ?)
+    ORDER BY created_at ASC
+    `,
+    [myId, targetId, targetId, myId],
+    (err, results) => {
+      if (err) return res.status(500).json({ message: "DB error" });
+      res.json(results);
+    }
+  );
+});
+
+server.listen(3001, () => {
   console.log("🚀 Server running on port 3001")
 })
+
 
 
 
