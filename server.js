@@ -9,6 +9,7 @@ const bcrypt = require("bcrypt")
 const cloudinary = require("cloudinary").v2;
 const axios = require("axios");
 const nodemailer = require("nodemailer");
+const multer = require("multer");
 const http = require("http");
 const { Server } = require("socket.io");
 const otpStore = {};
@@ -609,6 +610,7 @@ io.on("connection", (socket) => {
 server.listen(3001, () => {
   console.log("🚀 Server running on port 3001")
 })
+
 
 
 
