@@ -49,10 +49,7 @@ const db = mysql.createPool({
   database: "b4k7lvucka06qzmkt9oe"
 })
 
-db.connect(err => {
-  if (err) throw err
-  console.log("✅ MySQL Connected")
-})
+
 
 
 console.log("BREVO KEY exists:", !!process.env.BREVO_SMTP_KEY);
@@ -571,6 +568,7 @@ app.get("/chat-history/:targetId", verifyToken, (req, res) => {
 server.listen(3001, () => {
   console.log("🚀 Server running on port 3001")
 })
+
 
 
 
