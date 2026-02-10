@@ -540,31 +540,36 @@
           let imageUrl = null;
 
           if (picture) {
-            console.log("Uploading image to Cloudinary...");
-            const response = await axios.get(picture, {
-              responseType: "arraybuffer",
-              timeout: 10000,
-              headers: {
-                "User-Agent": "Mozilla/5.0",
-              },
-            });
-
-            const uploadResult = await new Promise((resolve, reject) => {
-              cloudinary.uploader.upload_stream(
-                {
-                  folder: "avatars",
-                  public_id: `google_${username.replace(/\s+/g, "_")}`,
-                  overwrite: true,
-                  resource_type: "image",
+            try {
+              console.log("Uploading image to Cloudinary...");
+              const response = await axios.get(picture, {
+                responseType: "arraybuffer",
+                timeout: 10000,
+                headers: {
+                  "User-Agent": "Mozilla/5.0",
                 },
-                (error, result) => {
-                  if (error) return reject(error);
-                  resolve(result);
-                }
-              ).end(Buffer.from(response.data));
-            });
+              });
 
-            imageUrl = uploadResult.secure_url;
+              const uploadResult = await new Promise((resolve, reject) => {
+                cloudinary.uploader.upload_stream(
+                  {
+                    folder: "avatars",
+                    public_id: `google_${username.replace(/\s+/g, "_")}`,
+                    overwrite: true,
+                    resource_type: "image",
+                  },
+                  (error, result) => {
+                    if (error) return reject(error);
+                    resolve(result);
+                  }
+                ).end(Buffer.from(response.data));
+              });
+
+              imageUrl = uploadResult.secure_url;
+            } catch (uploadErr) {
+              console.error("Cloudinary upload failed, using Google URL:", uploadErr.message);
+              imageUrl = picture;
+            }
           }
 
           // 💾 insert user
