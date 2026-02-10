@@ -100,7 +100,7 @@ async function checkToxic(message) {
       `https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze?key=${PERSPECTIVE_API_KEY}`,
       {
         comment: { text: message },
-        languages: ["th", "en"],
+        languages: ["en"],
         requestedAttributes: { TOXICITY: {} },
       }
     );
