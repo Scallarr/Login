@@ -280,32 +280,84 @@ app.post("/verify-otp", (req, res) => {
 
 
 
-app.post("/forgot-password", async (req, res) => {
-  const { username, gmail, newPassword } = req.body;
+// Step 1: ส่ง OTP ไปที่ gmail สำหรับ forgot password
+app.post("/forgot-password-otp", (req, res) => {
+  const { gmail } = req.body;
 
-  console.log(username, gmail, newPassword);
+  if (!gmail) return res.status(400).json({ message: "กรุณากรอก Gmail" });
+
+  db.query("SELECT * FROM users WHERE email = ?", [gmail], async (err, results) => {
+    if (err) return res.status(500).json({ message: "DB error" });
+    if (results.length === 0) return res.status(404).json({ message: "ไม่พบอีเมลนี้ในระบบ" });
+
+    // ลบ OTP เก่า
+    db.query("DELETE FROM otp_codes WHERE email = ?", [gmail]);
+
+    const otp = Math.floor(100000 + Math.random() * 900000);
+    const expire = new Date(Date.now() + 5 * 60 * 1000);
+
+    db.query(
+      "INSERT INTO otp_codes (email, otp, expire_at) VALUES (?, ?, ?)",
+      [gmail, otp, expire],
+      async (err) => {
+        if (err) return res.status(500).json({ message: "OTP save failed" });
+
+        try {
+          await sendOtpMail(gmail, otp);
+          res.json({ message: "OTP sent to your email" });
+        } catch (mailErr) {
+          console.error(mailErr);
+          res.status(500).json({ message: "Send email failed" });
+        }
+      }
+    );
+  });
+});
+
+// Step 2: ยืนยัน OTP สำหรับ forgot password
+app.post("/verify-forgot-otp", (req, res) => {
+  const { gmail, otp } = req.body;
+
+  if (!gmail || !otp) return res.status(400).json({ message: "Missing fields" });
 
   db.query(
-    "SELECT * FROM users WHERE name = ? AND email = ?",
-    [username, gmail],
+    "SELECT * FROM otp_codes WHERE email = ? AND otp = ? AND expire_at > NOW()",
+    [gmail, otp],
+    (err, results) => {
+      if (err) return res.status(500).json({ message: "DB error" });
+      if (results.length === 0) return res.status(400).json({ message: "OTP ไม่ถูกต้องหรือหมดอายุ" });
+
+      res.json({ message: "OTP verified" });
+    }
+  );
+});
+
+// Step 3: เปลี่ยนรหัสผ่านใหม่
+app.post("/reset-password", (req, res) => {
+  const { gmail, otp, newPassword } = req.body;
+
+  if (!gmail || !otp || !newPassword) return res.status(400).json({ message: "Missing fields" });
+
+  // เช็ค OTP อีกรอบเพื่อความปลอดภัย
+  db.query(
+    "SELECT * FROM otp_codes WHERE email = ? AND otp = ? AND expire_at > NOW()",
+    [gmail, otp],
     async (err, results) => {
-
-      if (err)
-        return res.status(500).json({ message: "DB error" });
-
-      if (results.length === 0) {
-        return res
-          .status(404)
-          .json({ message: "User not found" });
-      }
+      if (err) return res.status(500).json({ message: "DB error" });
+      if (results.length === 0) return res.status(400).json({ message: "OTP ไม่ถูกต้องหรือหมดอายุ" });
 
       const hashedPassword = await bcrypt.hash(newPassword, 10);
 
       db.query(
-        "UPDATE users SET password = ? WHERE name = ?",
-        [hashedPassword, username],
-        () => {
-          res.json({ message: "Password reset success" });
+        "UPDATE users SET password = ? WHERE email = ?",
+        [hashedPassword, gmail],
+        (err) => {
+          if (err) return res.status(500).json({ message: "Reset failed" });
+
+          // ลบ OTP หลังใช้งาน
+          db.query("DELETE FROM otp_codes WHERE email = ?", [gmail]);
+
+          res.json({ message: "เปลี่ยนรหัสผ่านสำเร็จ" });
         }
       );
     }
