@@ -39,7 +39,7 @@ module.exports = cloudinary;
 
 
 
-
+const PERSPECTIVE_API_KEY = "AIzaSyDKHBzVBCLpeBbPlz18w2bM5eWkw-Kgne4";
 const SECRET_KEY = "TestSecretKey"
 
 // 🔹 MySQL
@@ -89,6 +89,32 @@ async function sendOtpMail(email, otp) {
       },
     }
   );
+}
+
+
+async function checkToxic(message) {
+  if (!message) return false;
+
+  try {
+    const res = await axios.post(
+      `https://commentanalyzer.googleapis.com/v1alpha1/comments:analyze?key=${PERSPECTIVE_API_KEY}`,
+      {
+        comment: { text: message },
+        languages: ["th", "en"],
+        requestedAttributes: { TOXICITY: {} },
+      }
+    );
+
+    const score =
+      res.data.attributeScores.TOXICITY.summaryScore.value;
+
+    console.log("TOXICITY SCORE:", score);
+
+    return score > 0.7; // threshold 70%
+  } catch (err) {
+    console.error("Perspective API error:", err.message);
+    return false;
+  }
 }
 
 
@@ -647,7 +673,7 @@ io.on("connection", (socket) => {
     io.to(room).emit("messageDeleted", { messageId });
   });
 
-  socket.on("sendMessage", (data) => {
+  socket.on("sendMessage", async (data) => {
     const { senderId, receiverId, message, image } = data;
 
     const room =
@@ -655,6 +681,14 @@ io.on("connection", (socket) => {
         ? `${senderId}_${receiverId}`
         : `${receiverId}_${senderId}`;
 
+const isToxic = await checkToxic(message);
+
+if (isToxic) {
+  return socket.emit("messageBlocked", {
+    error: "ข้อความไม่เหมาะสม กรุณาใช้ถ้อยคำสุภาพ",
+  });
+}
+        
     db.query(
       "INSERT INTO messages (sender_id, receiver_id, message, image) VALUES (?, ?, ?, ?)",
       [senderId, receiverId, message || null, image || null],
