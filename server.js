@@ -61,7 +61,7 @@
       "https://api.brevo.com/v3/smtp/email",
       {
         sender: {
-          name: "My App",
+          name: " ทีมงาน ขวัญใจตี๋",
           email: "kasiditkosit@gmail.com",
         },
         to: [
